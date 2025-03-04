@@ -1,6 +1,8 @@
-# VK to Telegram Repost Bot
+# VK to TG RepostBot
 
-Бот для автоматического репоста записей из ВКонтакте в Telegram.
+Бот для репоста записей из ВК в Telegram.
+
+Дань уважения моему хорошему [другу](github.com/dx3mod) и его [оригинальному](https://github.com/dx3mod/repostbot/tree/master) репостботу.
 
 ## Настройка
 
@@ -19,3 +21,11 @@
 ```bash
 go run main.go
 ```
+
+## Сборка
+
+```bash
+go build -o vktgbot main.go
+```
+
+Многое нужно фиксить...
