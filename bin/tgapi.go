@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/mymmrac/telego"
@@ -13,7 +14,7 @@ type TelegramService struct {
 
 func NewTelegramService(token string) (*TelegramService, error) {
 	if token == "" {
-		return nil, errors.New("Telegram token is required")
+		return nil, errors.New("telegram token is required")
 	}
 
 	bot, err := telego.NewBot(token)
@@ -32,45 +33,40 @@ func (tg *TelegramService) SendPost(chatID int, post VKPost) (int, error) {
 		messageText = "Новый пост из ВКонтакте"
 	}
 
-	// Добавляем дату поста
 	date := fmt.Sprintf("\n\nДата публикации: %s",
 		fmt.Sprintf("<i>%s</i>", formatUnixTime(post.Date)))
 	messageText += date
 
-	// Проверяем наличие вложений
 	vkService := &VKService{}
 	attachments := vkService.GetAttachments(post)
 
 	var sentMessage *telego.Message
 	var err error
+	ctx := context.TODO()
 
 	if len(attachments) > 0 {
-		// Если есть одно изображение, отправляем его с текстом
 		photoURL := attachments[0]
-
 		params := tu.Photo(
-			tu.ID(chatID),
+			tu.ID(int64(chatID)),
 			tu.FileFromURL(photoURL),
 		).WithCaption(messageText).WithParseMode(telego.ModeHTML)
 
-		sentMessage, err = tg.bot.SendPhoto(params)
+		sentMessage, err = tg.bot.SendPhoto(ctx, params)
 		if err != nil {
-			// В случае ошибки отправляем просто текст
 			msgParams := tu.Message(
-				tu.ID(chatID),
+				tu.ID(int64(chatID)),
 				messageText,
 			).WithParseMode(telego.ModeHTML)
 
-			sentMessage, err = tg.bot.SendMessage(msgParams)
+			sentMessage, err = tg.bot.SendMessage(ctx, msgParams)
 		}
 	} else {
-		// Если нет вложений, просто отправляем текст
 		msgParams := tu.Message(
-			tu.ID(chatID),
+			tu.ID(int64(chatID)),
 			messageText,
 		).WithParseMode(telego.ModeHTML)
 
-		sentMessage, err = tg.bot.SendMessage(msgParams)
+		sentMessage, err = tg.bot.SendMessage(ctx, msgParams)
 	}
 
 	if err != nil {
@@ -82,7 +78,6 @@ func (tg *TelegramService) SendPost(chatID int, post VKPost) (int, error) {
 
 func formatUnixTime(unixTime int) string {
 	return fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d",
-		// Преобразуем Unix время в человекочитаемый формат
 		1970+unixTime/(60*60*24*365),
 		(unixTime/(60*60*24*30))%12+1,
 		(unixTime/(60*60*24))%30+1,
