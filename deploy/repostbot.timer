@@ -1,0 +1,10 @@
+[Unit]
+Description=Run VK Telegram Repost Bot periodically
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+Unit=repostbot.service
+
+[Install]
+WantedBy=timers.target

@@ -1,31 +1,42 @@
 package config
 
 import (
-	"encoding/json"
+	"fmt"
 	"os"
 )
 
 type Config struct {
-	VKToken      string `json:"vk_token"`
-	TGToken      string `json:"tg_token"`
-	ChatID       string `json:"chat_id"`
-	PollInterval int    `json:"poll_interval"`
-	TargetUser   string `json:"target_user"`
-	CacheFile    string `json:"cache_file"`
+	TGToken      string
+	VKToken      string
+	TargetUser   string
+	CacheFile    string
+	PollInterval int
+	ChatID       string
 }
 
-func LoadConfig(path string) (*Config, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
+func LoadConfig() (*Config, error) {
+	cfg := Config{
+		TGToken:      os.Getenv("TG_TOKEN"),
+		VKToken:      os.Getenv("VK_TOKEN"),
+		TargetUser:   os.Getenv("TARGET_USER"),
+		CacheFile:    os.Getenv("CACHE_FILE"),
+		PollInterval: getIntEnv("POLL_INTERVAL"),
+		ChatID:       os.Getenv("CHAT_ID"),
 	}
-	defer file.Close()
 
-	var cfg Config
-	err = json.NewDecoder(file).Decode(&cfg)
-	if err != nil {
-		return nil, err
+	if cfg.TGToken == "" || cfg.VKToken == "" || cfg.TargetUser == "" || cfg.CacheFile == "" || cfg.ChatID == "" {
+		return nil, fmt.Errorf("missing required environment variables")
 	}
 
 	return &cfg, nil
+}
+
+func getIntEnv(key string) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return 0
+	}
+	var intValue int
+	fmt.Sscanf(value, "%d", &intValue)
+	return intValue
 }

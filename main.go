@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	cfg, err := config.LoadConfig("config/config.json")
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Не удалось загрузить конфиг: %v", err)
 	}

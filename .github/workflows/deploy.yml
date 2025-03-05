@@ -1,0 +1,72 @@
+name: Deploy VK Telegram Repost Bot
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+
+      - name: Build the bot
+        run: |
+          go build -o repostbot main.go
+
+      - name: Generate systemd files
+        run: |
+          mkdir -p deploy/systemd
+          sed "s|%USER%|${{ secrets.SYSTEMD_USER }}|g" deploy/repostbot.service > deploy/systemd/repostbot.service
+          sed "s|%WORKDIR%|${{ secrets.WORKDIR }}|g" deploy/systemd/repostbot.service > deploy/systemd/repostbot.service.tmp
+          sed "s|%ENVFILE%|${{ secrets.ENVFILE }}|g" deploy/systemd/repostbot.service.tmp > deploy/systemd/repostbot.service
+          cp deploy/repostbot.timer deploy/systemd/
+          sed "s|%TG_TOKEN%|${{ secrets.TG_TOKEN }}|g" deploy/repostbot.env > deploy/systemd/repostbot.env
+          sed "s|%VK_TOKEN%|${{ secrets.VK_TOKEN }}|g" deploy/systemd/repostbot.env > deploy/systemd/repostbot.env.tmp
+          sed "s|%TARGET_USER%|${{ secrets.TARGET_USER }}|g" deploy/systemd/repostbot.env.tmp > deploy/systemd/repostbot.env
+          sed "s|%CACHE_FILE%|${{ secrets.CACHE_FILE }}|g" deploy/systemd/repostbot.env > deploy/systemd/repostbot.env.final
+          mv deploy/systemd/repostbot.env.final deploy/systemd/repostbot.env
+
+      - name: Deploy to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "repostbot,deploy/systemd/*"
+          target: "${{ secrets.WORKDIR }}"
+
+      - name: Configure systemd
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            sudo systemctl stop repostbot.service || true
+            sudo systemctl stop repostbot.timer || true
+            sudo cp ${{ secrets.WORKDIR }}/repostbot /usr/local/bin/repostbot
+            sudo cp ${{ secrets.WORKDIR }}/repostbot.service /etc/systemd/system/repostbot.service
+            sudo cp ${{ secrets.WORKDIR }}/repostbot.timer /etc/systemd/system/repostbot.timer
+            sudo cp ${{ secrets.WORKDIR }}/repostbot.env /etc/default/repostbot.env
+            sudo systemctl daemon-reload
+            sudo systemctl enable repostbot.service
+            sudo systemctl enable repostbot.timer
+            sudo systemctl start repostbot.timer
+      - name: Generate .env file
+        run: |
+          echo "TG_TOKEN=${{ secrets.TG_TOKEN }}" > deploy/repostbot.env
+          echo "VK_TOKEN=${{ secrets.VK_TOKEN }}" >> deploy/repostbot.env
+          echo "TARGET_USER=${{ secrets.TARGET_USER }}" >> deploy/repostbot.env
+          echo "CACHE_FILE=${{ secrets.CACHE_FILE }}" >> deploy/repostbot.env
+          echo "POLL_INTERVAL=${{ secrets.POLL_INTERVAL }}" >> deploy/repostbot.env
+          echo "CHAT_ID=${{ secrets.CHAT_ID }}" >> deploy/repostbot.env
