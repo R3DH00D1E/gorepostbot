@@ -10,13 +10,16 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      # 1. Клонирование репозитория
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # 2. Сборка бота
       - name: Build the bot
         run: |
           go build -o repostbot main.go
 
+      # 3. Генерация .env файла
       - name: Generate .env file
         run: |
           echo "TG_TOKEN=${{ secrets.TG_TOKEN }}" > deploy/repostbot.env
@@ -26,27 +29,22 @@ jobs:
           echo "POLL_INTERVAL=${{ secrets.POLL_INTERVAL }}" >> deploy/repostbot.env
           echo "CHAT_ID=${{ secrets.CHAT_ID }}" >> deploy/repostbot.env
 
-      - name: Deploy to server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "repostbot,deploy/repostbot.env"
-          target: "${{ secrets.WORKDIR }}"
+      # 4. Копирование файлов в рабочую директорию
+      - name: Copy files to target directory
+        run: |
+          TARGET_DIR="${{ secrets.WORKDIR }}"
+          mkdir -p "$TARGET_DIR"
+          cp repostbot "$TARGET_DIR/"
+          cp deploy/repostbot.env "$TARGET_DIR/"
 
+      # 5. Настройка службы systemd
       - name: Configure systemd
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            sudo systemctl stop repostbot.service || true
-            sudo systemctl stop repostbot.timer || true
-            sudo cp ${{ secrets.WORKDIR }}/repostbot /usr/local/bin/repostbot
-            sudo cp ${{ secrets.WORKDIR }}/repostbot.env /etc/default/repostbot.env
-            sudo systemctl daemon-reload
-            sudo systemctl enable repostbot.service
-            sudo systemctl enable repostbot.timer
-            sudo systemctl start repostbot.timer
+        run: |
+          sudo systemctl stop repostbot.service || true
+          sudo systemctl stop repostbot.timer || true
+          sudo cp "${{ secrets.WORKDIR }}/repostbot" /usr/local/bin/repostbot
+          sudo cp "${{ secrets.WORKDIR }}/repostbot.env" /etc/default/repostbot.env
+          sudo systemctl daemon-reload
+          sudo systemctl enable repostbot.service
+          sudo systemctl enable repostbot.timer
+          sudo systemctl start repostbot.timer
