@@ -10,55 +10,57 @@ import (
 )
 
 func main() {
-
 	cfg, err := config.LoadConfig("config/config.json")
 	if err != nil {
 		log.Fatalf("Не удалось загрузить конфиг: %v", err)
 	}
+	log.Printf("Конфиг загружен: %+v", cfg)
 
 	vkClient := lib.NewVKClient(cfg.VKToken)
 	tgClient := lib.NewTGClient(cfg.TGToken, cfg.ChatID)
 
 	cache, err := bin.LoadCache(cfg.CacheFile)
 	if err != nil {
-		log.Printf("Не удалось загрузить конфиг: %v", err)
-		cache = &bin.Cache{}
+		log.Fatalf("Не удалось загрузить кэш: %v", err)
 	}
-
-	var photoURLs []string
+	log.Printf("Загружен кэш: %+v", cache)
 
 	for {
 		posts, err := vkClient.GetWallPosts(cfg.TargetUser, 10)
 		if err != nil {
-			log.Printf("Ну удалось прочитать новые посты %v", err)
+			log.Printf("Не удалось просмотреть посты: %v", err)
+			time.Sleep(time.Duration(cfg.PollInterval) * time.Second)
 			continue
 		}
 
 		for _, post := range posts {
-			if post.ID > cache.LastPostID {
+			if post.ID <= cache.LastPostID {
+				continue
+			}
 
-				err := tgClient.SendMessage(post.Text)
-				if err != nil {
-					log.Printf("Failed to send message: %v", err)
-				}
+			tgMessageID, err := tgClient.SendMessage(post.Text)
+			if err != nil {
+				log.Printf("Не удалось отправить сообщение: %v", err)
+				continue
+			}
 
-				for _, attachment := range post.Attachments {
-					if attachment.Type == "photo" && attachment.Photo != nil {
-						lastSize := attachment.Photo.Sizes[len(attachment.Photo.Sizes)-1]
-						err := tgClient.SendPhoto(lastSize.URL)
-						if err != nil {
-							log.Printf("Failed to send photo: %v", err)
-						}
-						photoURLs = append(photoURLs, lastSize.URL)
-					}
-				}
-
-				if len(photoURLs) > 0 {
-					err := tgClient.SendMediaGroup(photoURLs)
+			for _, attachment := range post.Attachments {
+				if attachment.Type == "photo" && attachment.Photo != nil {
+					lastSize := attachment.Photo.Sizes[len(attachment.Photo.Sizes)-1]
+					err := tgClient.SendPhoto(lastSize.URL)
 					if err != nil {
-						log.Printf("Failed to send media group: %v", err)
+						log.Printf("Не удалось отправить фото %v", err)
 					}
 				}
+			}
+
+			cache.AddPost(bin.Post{
+				VKRecordID:   post.ID,
+				TGMessageID:  tgMessageID,
+				LastModified: post.Date,
+			})
+
+			if post.ID > cache.LastPostID {
 				cache.LastPostID = post.ID
 			}
 		}

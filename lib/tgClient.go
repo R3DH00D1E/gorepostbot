@@ -16,7 +16,7 @@ func NewTGClient(token, chatID string) *TGClient {
 	return &TGClient{Token: token, ChatID: chatID}
 }
 
-func (c *TGClient) SendMessage(text string) error {
+func (c *TGClient) SendMessage(text string) (int, error) {
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", c.Token)
 	payload := map[string]string{
 		"chat_id": c.ChatID,
@@ -25,20 +25,33 @@ func (c *TGClient) SendMessage(text string) error {
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return 0, fmt.Errorf("failed to marshal payload: %v", err)
 	}
 
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		return err
+		return 0, fmt.Errorf("failed to send HTTP request: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("не удалось отправить сообщение: %s", resp.Status)
+		var respBody map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&respBody)
+		return 0, fmt.Errorf("failed to send message: status=%d, body=%v", resp.StatusCode, respBody)
 	}
 
-	return nil
+	// Декодируем ответ Telegram
+	var result struct {
+		Result struct {
+			MessageID int `json:"message_id"`
+		} `json:"result"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return 0, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return result.Result.MessageID, nil
 }
 
 func (c *TGClient) SendPhoto(photoURL string) error {
@@ -99,6 +112,34 @@ func (c *TGClient) SendMediaGroup(photoURLs []string) error {
 		var respBody map[string]interface{}
 		json.NewDecoder(resp.Body).Decode(&respBody)
 		return fmt.Errorf("failed to send media group: status=%d, body=%v", resp.StatusCode, respBody)
+	}
+
+	return nil
+}
+
+func (c *TGClient) EditMessage(messageID int, text string) error {
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/editMessageText", c.Token)
+	payload := map[string]interface{}{
+		"chat_id":    c.ChatID,
+		"message_id": messageID,
+		"text":       text,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %v", err)
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		return fmt.Errorf("failed to send HTTP request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var respBody map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&respBody)
+		return fmt.Errorf("failed to edit message: status=%d, body=%v", resp.StatusCode, respBody)
 	}
 
 	return nil
