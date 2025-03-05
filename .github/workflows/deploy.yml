@@ -19,12 +19,12 @@ jobs:
 
       - name: Generate .env file
         run: |
-          echo "TG_TOKEN=${{ secrets.TG_TOKEN }}" > deploy/repostbot.env
-          echo "VK_TOKEN=${{ secrets.VK_TOKEN }}" >> deploy/repostbot.env
-          echo "TARGET_USER=${{ secrets.TARGET_USER }}" >> deploy/repostbot.env
-          echo "CACHE_FILE=${{ secrets.CACHE_FILE }}" >> deploy/repostbot.env
-          echo "POLL_INTERVAL=${{ secrets.POLL_INTERVAL }}" >> deploy/repostbot.env
-          echo "CHAT_ID=${{ secrets.CHAT_ID }}" >> deploy/repostbot.env
+          echo "TG_TOKEN=\"${{ secrets.TG_TOKEN }}\"" > deploy/repostbot.env
+          echo "VK_TOKEN=\"${{ secrets.VK_TOKEN }}\"" >> deploy/repostbot.env
+          echo "TARGET_USER=\"${{ secrets.TARGET_USER }}\"" >> deploy/repostbot.env
+          echo "CACHE_FILE=\"${{ secrets.CACHE_FILE }}\"" >> deploy/repostbot.env
+          echo "POLL_INTERVAL=\"${{ secrets.POLL_INTERVAL }}\"" >> deploy/repostbot.env
+          echo "CHAT_ID=\"${{ secrets.CHAT_ID }}\"" >> deploy/repostbot.env
 
       - name: Copy files to target directory
         run: |
