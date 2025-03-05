@@ -6,11 +6,12 @@ import (
 )
 
 type Config struct {
-	VkToken      string `json:"vk_token"`
+	VKToken      string `json:"vk_token"`
 	TGToken      string `json:"tg_token"`
 	ChatID       string `json:"chat_id"`
 	PollInterval int    `json:"poll_interval"`
-	OwnerID      string `json:"owner_id"`
+	TargetUser   string `json:"target_user"`
+	CacheFile    string `json:"cache_file"`
 }
 
 func LoadConfig(path string) (*Config, error) {
