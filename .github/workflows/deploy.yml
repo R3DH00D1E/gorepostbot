@@ -17,16 +17,27 @@ jobs:
         run: |
           go build -o repostbot main.go
 
-      - name: Generate .env file
+      - name: Substitute placeholders in config.json
         run: |
-          echo "TG_TOKEN=\"${{ secrets.TG_TOKEN }}\"" > deploy/repostbot.env
-          echo "VK_TOKEN=\"${{ secrets.VK_TOKEN }}\"" >> deploy/repostbot.env
-          echo "TARGET_USER=\"${{ secrets.TARGET_USER }}\"" >> deploy/repostbot.env
-          echo "CACHE_FILE=\"${{ secrets.CACHE_FILE }}\"" >> deploy/repostbot.env
-          echo "POLL_INTERVAL=\"${{ secrets.POLL_INTERVAL }}\"" >> deploy/repostbot.env
-          echo "CHAT_ID=\"${{ secrets.CHAT_ID }}\"" >> deploy/repostbot.env
+          # Проверяем, существует ли файл
+          if [ ! -f deploy/config.json ]; then
+            echo "Error: deploy/config.json not found."
+            exit 1
+          fi
 
-      - name: Copy files to target directory
+          # Заменяем плейсхолдеры на значения из GitHub Secrets
+          sed -e "s|your_telegram_token_here|${{ secrets.TG_TOKEN }}|g" \
+              -e "s|your_vk_token_here|${{ secrets.VK_TOKEN }}|g" \
+              -e "s|user_id_vk|${{ secrets.TARGET_USER }}|g" \
+              -e "s|path/to/cache.json|${{ secrets.CACHE_FILE }}|g" \
+              -e "s|120|${{ secrets.POLL_INTERVAL }}|g" \
+              -e "s|-1001234567890|${{ secrets.CHAT_ID }}|g" \
+              deploy/config.json > deploy/config.json.tmp
+
+          # Перемещаем временный файл обратно
+          mv deploy/config.json.tmp deploy/config.json
+
+      - name: Copy config.json to target directory
         run: |
           TARGET_DIR="${{ secrets.WORKDIR }}"
           if [ -z "$TARGET_DIR" ]; then
@@ -34,8 +45,7 @@ jobs:
             exit 1
           fi
           mkdir -p "$TARGET_DIR"
-          cp repostbot "$TARGET_DIR/"
-          cp deploy/repostbot.env "$TARGET_DIR/"
+          cp deploy/config.json "$TARGET_DIR/"
 
       - name: Substitute placeholders in repostbot.service
         run: |

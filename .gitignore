@@ -4,9 +4,8 @@
 
 *.exe
 
-
-/config/config.json
 /bin/cache.json
+cache.json
 
 .vscode/
 .idea/

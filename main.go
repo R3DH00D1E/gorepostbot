@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -10,10 +11,19 @@ import (
 )
 
 func main() {
+	// Загружаем конфигурацию
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Ошибка загрузки конфигурации: %v", err)
 	}
+
+	// Выводим значения переменных окружения
+	fmt.Println("TG_TOKEN:", cfg.TGToken)
+	fmt.Println("VK_TOKEN:", cfg.VKToken)
+	fmt.Println("CHAT_ID:", cfg.ChatID)
+	fmt.Println("CACHE_FILE:", cfg.CacheFile)
+	fmt.Println("POLL_INTERVAL:", cfg.PollInterval)
+	fmt.Println("TARGET_USER:", cfg.TargetUser)
 
 	vkClient := lib.NewVKClient(cfg.VKToken)
 	tgClient := lib.NewTGClient(cfg.TGToken, cfg.ChatID)

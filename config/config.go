@@ -1,62 +1,44 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	TGToken      string
-	VKToken      string
-	TargetUser   string
-	CacheFile    string
-	PollInterval int
-	ChatID       string
+	TGToken      string `json:"TG_TOKEN"`
+	VKToken      string `json:"VK_TOKEN"`
+	TargetUser   string `json:"TARGET_USER"`
+	CacheFile    string `json:"CACHE_FILE"`
+	PollInterval int    `json:"POLL_INTERVAL"`
+	ChatID       string `json:"CHAT_ID"`
 }
 
 func LoadConfig() (*Config, error) {
-	envPath := os.Getenv("ENV_PATH")
-	if envPath == "" {
+	configPath := os.Getenv("CONFIG_PATH")
+	if configPath == "" {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			return nil, fmt.Errorf("failed to determine user home directory: %w", err)
 		}
-		envPath = filepath.Join(homeDir, "repostbot", "repostbot.env")
+		configPath = filepath.Join(homeDir, "repostbot", "config.json")
 	}
 
-	if _, err := os.Stat(envPath); err == nil {
-		if err := godotenv.Load(envPath); err != nil {
-			return nil, fmt.Errorf("failed to load .env file (%s): %w", envPath, err)
-		}
-	} else if !os.IsNotExist(err) {
-		return nil, fmt.Errorf("failed to access .env file (%s): %w", envPath, err)
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file (%s): %w", configPath, err)
 	}
 
-	cfg := Config{
-		TGToken:      os.Getenv("TG_TOKEN"),
-		VKToken:      os.Getenv("VK_TOKEN"),
-		TargetUser:   os.Getenv("TARGET_USER"),
-		CacheFile:    os.Getenv("CACHE_FILE"),
-		PollInterval: getIntEnv("POLL_INTERVAL"),
-		ChatID:       os.Getenv("CHAT_ID"),
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
 	if cfg.TGToken == "" || cfg.VKToken == "" || cfg.TargetUser == "" || cfg.CacheFile == "" || cfg.ChatID == "" {
-		return nil, fmt.Errorf("missing required environment variables")
+		return nil, fmt.Errorf("missing required configuration fields")
 	}
 
 	return &cfg, nil
-}
-
-func getIntEnv(key string) int {
-	value := os.Getenv(key)
-	if value == "" {
-		return 0
-	}
-	var intValue int
-	fmt.Sscanf(value, "%d", &intValue)
-	return intValue
 }
