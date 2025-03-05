@@ -7,16 +7,10 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
-
+    runs-on: self-hosted  # Использовать self-hosted runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.24'
 
       - name: Build the bot
         run: |
