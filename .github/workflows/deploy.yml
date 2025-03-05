@@ -10,16 +10,13 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      # 1. Клонирование репозитория
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Сборка бота
       - name: Build the bot
         run: |
           go build -o repostbot main.go
 
-      # 3. Генерация .env файла
       - name: Generate .env file
         run: |
           echo "TG_TOKEN=${{ secrets.TG_TOKEN }}" > deploy/repostbot.env
@@ -29,22 +26,28 @@ jobs:
           echo "POLL_INTERVAL=${{ secrets.POLL_INTERVAL }}" >> deploy/repostbot.env
           echo "CHAT_ID=${{ secrets.CHAT_ID }}" >> deploy/repostbot.env
 
-      # 4. Копирование файлов в рабочую директорию
       - name: Copy files to target directory
         run: |
           TARGET_DIR="${{ secrets.WORKDIR }}"
+          if [ -z "$TARGET_DIR" ]; then
+            echo "Error: WORKDIR is not set or empty."
+            exit 1
+          fi
           mkdir -p "$TARGET_DIR"
           cp repostbot "$TARGET_DIR/"
           cp deploy/repostbot.env "$TARGET_DIR/"
 
-      # 5. Настройка службы systemd
+      - name: Copy systemd service and timer files
+        run: |
+          sudo cp deploy/repostbot.service /etc/systemd/system/repostbot.service
+          sudo cp deploy/repostbot.timer /etc/systemd/system/repostbot.timer
+
       - name: Configure systemd
         run: |
-          sudo systemctl stop repostbot.service || true
-          sudo systemctl stop repostbot.timer || true
-          sudo cp "${{ secrets.WORKDIR }}/repostbot" /usr/local/bin/repostbot
-          sudo cp "${{ secrets.WORKDIR }}/repostbot.env" /etc/default/repostbot.env
+          # Обновляем конфигурацию systemd
           sudo systemctl daemon-reload
+
+          # Включаем и запускаем службы
           sudo systemctl enable repostbot.service
           sudo systemctl enable repostbot.timer
           sudo systemctl start repostbot.timer
