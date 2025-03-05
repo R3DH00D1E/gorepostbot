@@ -2,7 +2,7 @@
 
 Бот для репоста записей из ВК в Telegram.
 
-Дань уважения моему хорошему [другу](github.com/dx3mod) и его [оригинальному](https://github.com/dx3mod/repostbot/tree/master) репостботу.
+Дань уважения моему хорошему [другу](https://github.com/dx3mod) и его [оригинальному](https://github.com/dx3mod/repostbot/tree/master) репостботу.
 
 ## Настройка
 
