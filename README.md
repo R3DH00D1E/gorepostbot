@@ -1,4 +1,4 @@
-# VK to TG RepostBot
+# VK to TG RepostBot on GOLang
 
 Бот для репоста записей из ВК в Telegram.
 
