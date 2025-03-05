@@ -12,9 +12,8 @@ import (
 func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Не удалось загрузить конфиг: %v", err)
+		log.Fatalf("Ошибка загрузки конфигурации: %v", err)
 	}
-	log.Printf("Конфиг загружен: %+v", cfg)
 
 	vkClient := lib.NewVKClient(cfg.VKToken)
 	tgClient := lib.NewTGClient(cfg.TGToken, cfg.ChatID)
