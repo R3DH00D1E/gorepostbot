@@ -85,7 +85,7 @@ func (c *TGClient) SendPhoto(photoURL string) error {
 		json.NewDecoder(resp.Body).Decode(&respBody)
 		return fmt.Errorf("failed to send photo: status=%d, body=%v", resp.StatusCode, respBody)
 	}
-
+	fmt.Printf("Sending message to Telegram: %+v\n", payload)
 	return nil
 }
 
@@ -121,7 +121,7 @@ func (c *TGClient) SendMediaGroup(photoURLs []string) error {
 		json.NewDecoder(resp.Body).Decode(&respBody)
 		return fmt.Errorf("failed to send media group: status=%d, body=%v", resp.StatusCode, respBody)
 	}
-
+	fmt.Printf("Sending message to Telegram: %+v\n", payload)
 	return nil
 }
 
@@ -149,6 +149,6 @@ func (c *TGClient) EditMessage(messageID int, text string) error {
 		json.NewDecoder(resp.Body).Decode(&respBody)
 		return fmt.Errorf("failed to edit message: status=%d, body=%v", resp.StatusCode, respBody)
 	}
-
+	fmt.Printf("Sending message to Telegram: %+v\n", payload)
 	return nil
 }

@@ -54,12 +54,19 @@ func main() {
 			}
 
 			for _, attachment := range post.Attachments {
-				if attachment.Type == "photo" && attachment.Photo != nil {
-					lastSize := attachment.Photo.Sizes[len(attachment.Photo.Sizes)-1]
-					err := tgClient.SendPhoto(lastSize.URL)
-					if err != nil {
-						log.Printf("Failed to send photo: %v", err)
+				switch attachment.Type {
+				case "photo":
+					if attachment.Photo != nil {
+						lastSize := attachment.Photo.Sizes[len(attachment.Photo.Sizes)-1]
+						err := tgClient.SendPhoto(lastSize.URL)
+						if err != nil {
+							log.Printf("Failed to send photo: %v", err)
+						}
 					}
+				case "video":
+					log.Printf("Video attachment detected (not supported yet): %+v", attachment)
+				default:
+					log.Printf("Unsupported attachment type: %s", attachment.Type)
 				}
 			}
 
@@ -71,8 +78,8 @@ func main() {
 				})
 			}
 
-			if post.ID > cache.LastPostID {
-				cache.LastPostID = post.ID
+			if cache.LastPostID == 0 {
+				cache.LastPostID = posts[0].ID
 			}
 		}
 
@@ -82,5 +89,8 @@ func main() {
 		}
 
 		time.Sleep(time.Duration(cfg.PollInterval) * time.Second)
+		if err != nil {
+			fmt.Println("Error:", err)
+		}
 	}
 }

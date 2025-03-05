@@ -51,15 +51,19 @@ func (c *VKClient) GetWallPosts(owner_id string, count int) ([]VKPost, error) {
 
 	resp, err := http.Get(fmt.Sprintf("%s?%s", baseURL, params.Encode()))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to send HTTP request: %v", err)
 	}
 	defer resp.Body.Close()
 
 	var result VKResponse
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode response: %v", err)
 	}
 
+	if len(result.Response.Items) == 0 {
+		return nil, fmt.Errorf("no posts found for owner_id=%s", owner_id)
+	}
+	fmt.Printf("VK API response: %+v\n", result.Response.Items)
 	return result.Response.Items, nil
 }
