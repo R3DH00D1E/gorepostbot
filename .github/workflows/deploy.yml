@@ -17,14 +17,15 @@ jobs:
         run: |
           go build -o repostbot main.go
 
-      - name: Substitute placeholders in config.json
+      - name: Check for config.json
         run: |
-          # Проверяем, существует ли файл
           if [ ! -f deploy/config.json ]; then
             echo "Error: deploy/config.json not found."
             exit 1
           fi
 
+      - name: Substitute placeholders in config.json
+        run: |
           # Заменяем плейсхолдеры на значения из GitHub Secrets
           sed -e "s|your_telegram_token_here|${{ secrets.TG_TOKEN }}|g" \
               -e "s|your_vk_token_here|${{ secrets.VK_TOKEN }}|g" \
