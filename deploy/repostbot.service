@@ -3,12 +3,11 @@ Description=RepostBot on the GO
 After=network.target
 
 [Service]
-Type=simple
-User=%USER%
-WorkingDirectory=%WORKDIR%
-ExecStart=/usr/bin/env repostbot
+ExecStart=/usr/local/bin/repostbot
+WorkingDirectory={{WORKDIR}}
 Restart=always
-EnvironmentFile=%ENVFILE%
+EnvironmentFile=/etc/default/repostbot.env
+User=runner
 
 [Install]
 WantedBy=multi-user.target

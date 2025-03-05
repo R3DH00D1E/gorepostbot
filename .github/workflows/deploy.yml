@@ -37,9 +37,13 @@ jobs:
           cp repostbot "$TARGET_DIR/"
           cp deploy/repostbot.env "$TARGET_DIR/"
 
-      - name: Copy systemd service and timer files
+      - name: Create repostbot.service with WORKDIR substitution
         run: |
+          sed "s|{{WORKDIR}}|${{ secrets.WORKDIR }}|g" deploy/repostbot.service.template > deploy/repostbot.service
           sudo cp deploy/repostbot.service /etc/systemd/system/repostbot.service
+
+      - name: Copy repostbot.timer
+        run: |
           sudo cp deploy/repostbot.timer /etc/systemd/system/repostbot.timer
 
       - name: Configure systemd
