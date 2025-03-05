@@ -8,9 +8,10 @@ import (
 )
 
 type VKPost struct {
-	ID   int    `json:"id"`
-	Text string `json:"text"`
-	Date int    `json:"date"`
+	ID          int            `json:"id"`
+	Text        string         `json:"text"`
+	Date        int            `json:"date"`
+	Attachments []VKAttachment `json:"attachments"`
 }
 
 type VKResponse struct {
@@ -21,6 +22,19 @@ type VKResponse struct {
 
 type VKClient struct {
 	Token string
+}
+
+type VKAttachment struct {
+	Type  string   `json:"type"`
+	Photo *VKPhoto `json:"photo,omitempty"`
+}
+
+type VKPhoto struct {
+	Sizes []VKPhotoSize `json:"sizes"`
+}
+
+type VKPhotoSize struct {
+	URL string `json:"url"`
 }
 
 func NewVKClient(token string) *VKClient {
