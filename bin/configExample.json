@@ -1,8 +1,0 @@
-{
-    "vk_token": "your_vk_token_here",
-    "tg_token": "your_telegram_token_here",
-    "chat_id": "your_telegram_chat_id_here",
-    "poll_interval": 120,
-    "target_user": "id_пользователя_вк",
-    "cache_file": "cache.json"
-}
