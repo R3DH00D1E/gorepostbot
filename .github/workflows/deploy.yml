@@ -37,9 +37,23 @@ jobs:
           cp repostbot "$TARGET_DIR/"
           cp deploy/repostbot.env "$TARGET_DIR/"
 
-      - name: Create repostbot.service with WORKDIR substitution
+      - name: Substitute placeholders in repostbot.service
         run: |
-          sed "s|{{WORKDIR}}|${{ secrets.WORKDIR }}|g" deploy/repostbot.service.template > deploy/repostbot.service
+          # Проверяем, существует ли файл
+          if [ ! -f deploy/repostbot.service ]; then
+            echo "Error: deploy/repostbot.service not found."
+            exit 1
+          fi
+
+          # Заменяем плейсхолдеры {{WORKDIR}} и %USER%
+          sed -e "s|{{WORKDIR}}|${{ secrets.WORKDIR }}|g" \
+              -e "s|%USER%|${{ secrets.USER }}|g" \
+              deploy/repostbot.service > deploy/repostbot.service.tmp
+
+          # Перемещаем временный файл обратно
+          mv deploy/repostbot.service.tmp deploy/repostbot.service
+
+          # Копируем файл службы в /etc/systemd/system/
           sudo cp deploy/repostbot.service /etc/systemd/system/repostbot.service
 
       - name: Copy repostbot.timer

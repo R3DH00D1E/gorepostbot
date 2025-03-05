@@ -7,7 +7,7 @@ ExecStart=/usr/local/bin/repostbot
 WorkingDirectory={{WORKDIR}}
 Restart=always
 EnvironmentFile=/etc/default/repostbot.env
-User=runner
+User=%USER%
 
 [Install]
 WantedBy=multi-user.target
