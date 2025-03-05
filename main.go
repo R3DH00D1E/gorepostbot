@@ -38,9 +38,9 @@ func main() {
 				continue
 			}
 
-			tgMessageID, err := tgClient.SendMessage(post.Text)
+			tgMessageIDs, err := tgClient.SendMessage(post.Text)
 			if err != nil {
-				log.Printf("Не удалось отправить сообщение: %v", err)
+				log.Printf("Failed to send message: %v", err)
 				continue
 			}
 
@@ -49,16 +49,18 @@ func main() {
 					lastSize := attachment.Photo.Sizes[len(attachment.Photo.Sizes)-1]
 					err := tgClient.SendPhoto(lastSize.URL)
 					if err != nil {
-						log.Printf("Не удалось отправить фото %v", err)
+						log.Printf("Failed to send photo: %v", err)
 					}
 				}
 			}
 
-			cache.AddPost(bin.Post{
-				VKRecordID:   post.ID,
-				TGMessageID:  tgMessageID,
-				LastModified: post.Date,
-			})
+			for _, tgMessageID := range tgMessageIDs {
+				cache.AddPost(bin.Post{
+					VKRecordID:   post.ID,
+					TGMessageID:  tgMessageID,
+					LastModified: post.Date,
+				})
+			}
 
 			if post.ID > cache.LastPostID {
 				cache.LastPostID = post.ID

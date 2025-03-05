@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"gorepostbot/utils"
 	"net/http"
 )
 
@@ -16,42 +17,49 @@ func NewTGClient(token, chatID string) *TGClient {
 	return &TGClient{Token: token, ChatID: chatID}
 }
 
-func (c *TGClient) SendMessage(text string) (int, error) {
-	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", c.Token)
-	payload := map[string]string{
-		"chat_id": c.ChatID,
-		"text":    text,
+func (c *TGClient) SendMessage(text string) ([]int, error) {
+
+	parts := utils.SplitText(text, 4096)
+	var messageIDs []int
+
+	for _, part := range parts {
+		url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", c.Token)
+		payload := map[string]string{
+			"chat_id": c.ChatID,
+			"text":    part,
+		}
+
+		body, err := json.Marshal(payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal payload: %v", err)
+		}
+
+		resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+		if err != nil {
+			return nil, fmt.Errorf("failed to send HTTP request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			var respBody map[string]interface{}
+			json.NewDecoder(resp.Body).Decode(&respBody)
+			return nil, fmt.Errorf("failed to send message: status=%d, body=%v", resp.StatusCode, respBody)
+		}
+
+		var result struct {
+			Result struct {
+				MessageID int `json:"message_id"`
+			} `json:"result"`
+		}
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode response: %v", err)
+		}
+
+		messageIDs = append(messageIDs, result.Result.MessageID)
 	}
 
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return 0, fmt.Errorf("failed to marshal payload: %v", err)
-	}
-
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
-	if err != nil {
-		return 0, fmt.Errorf("failed to send HTTP request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		var respBody map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&respBody)
-		return 0, fmt.Errorf("failed to send message: status=%d, body=%v", resp.StatusCode, respBody)
-	}
-
-	// Декодируем ответ Telegram
-	var result struct {
-		Result struct {
-			MessageID int `json:"message_id"`
-		} `json:"result"`
-	}
-	err = json.NewDecoder(resp.Body).Decode(&result)
-	if err != nil {
-		return 0, fmt.Errorf("failed to decode response: %v", err)
-	}
-
-	return result.Result.MessageID, nil
+	return messageIDs, nil
 }
 
 func (c *TGClient) SendPhoto(photoURL string) error {
