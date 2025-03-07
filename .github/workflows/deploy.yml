@@ -30,7 +30,7 @@ jobs:
           sed -e "s|your_telegram_token_here|${{ secrets.TG_TOKEN }}|g" \
               -e "s|your_vk_token_here|${{ secrets.VK_TOKEN }}|g" \
               -e "s|user_id_vk|${{ secrets.TARGET_USER }}|g" \
-              -e "s|path/to/cache.json|${{ secrets.CACHE_FILE }}|g" \
+              -e "s|path/to/cache.json|/home/${{ secrets.USER }}/repostbot/cache.json|g" \
               -e "s|120|${{ secrets.POLL_INTERVAL }}|g" \
               -e "s|-1001234567890|${{ secrets.CHAT_ID }}|g" \
               deploy/config.json > deploy/config.json.tmp
@@ -38,15 +38,20 @@ jobs:
           # Перемещаем временный файл обратно
           mv deploy/config.json.tmp deploy/config.json
 
-      - name: Copy config.json to target directory
+      - name: Create directory and copy config
         run: |
-          TARGET_DIR="${{ secrets.WORKDIR }}"
-          if [ -z "$TARGET_DIR" ]; then
-            echo "Error: WORKDIR is not set or empty."
-            exit 1
-          fi
-          mkdir -p "$TARGET_DIR"
-          cp deploy/config.json "$TARGET_DIR/"
+          # Создаем директорию в домашней папке для конфигурации
+          mkdir -p /home/${{ secrets.USER }}/repostbot
+          # Копируем конфигурацию
+          cp deploy/config.json /home/${{ secrets.USER }}/repostbot/
+          # Убедимся, что права доступа правильные
+          chown -R ${{ secrets.USER }}:${{ secrets.USER }} /home/${{ secrets.USER }}/repostbot
+
+      - name: Copy executable
+        run: |
+          # Копируем исполняемый файл
+          sudo cp repostbot /usr/local/bin/
+          sudo chmod +x /usr/local/bin/repostbot
 
       - name: Substitute placeholders in repostbot.service
         run: |
@@ -57,7 +62,7 @@ jobs:
           fi
 
           # Заменяем плейсхолдеры {{WORKDIR}} и %USER%
-          sed -e "s|{{WORKDIR}}|${{ secrets.WORKDIR }}|g" \
+          sed -e "s|{{WORKDIR}}|/home/${{ secrets.USER }}/repostbot|g" \
               -e "s|%USER%|${{ secrets.USER }}|g" \
               deploy/repostbot.service > deploy/repostbot.service.tmp
 
@@ -79,4 +84,5 @@ jobs:
           # Включаем и запускаем службы
           sudo systemctl enable repostbot.service
           sudo systemctl enable repostbot.timer
-          sudo systemctl start repostbot.timer
+          sudo systemctl restart repostbot.service
+          sudo systemctl restart repostbot.timer
