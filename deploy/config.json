@@ -2,7 +2,7 @@
     "vk_token": "your_vk_token_here",
     "tg_token": "your_telegram_token_here",
     "chat_id": "-1001234567890",
-    "poll_interval": 120,
+    "poll_interval": 10,
     "target_user": "user_id_vk",
     "cache_file": "path/to/cache.json"
 }

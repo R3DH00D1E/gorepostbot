@@ -6,7 +6,7 @@ After=network.target
 ExecStart=/usr/local/bin/repostbot
 WorkingDirectory={{WORKDIR}}
 Restart=always
-EnvironmentFile=/etc/default/repostbot.env
+Environment="CONFIG_PATH=%h/repostbot/config.json"
 User=%USER%
 
 [Install]
