@@ -74,26 +74,37 @@ jobs:
             echo "Warning: repostbot.timer not found, skipping"
           fi
 
-      - name: Stop existing services
+      - name: Stop existing services and processes
         run: |
           # Останавливаем существующие службы
           sudo systemctl stop repostbot.service || true
           sudo systemctl stop repostbot.timer || true
-          # Даем процессу время завершиться
-          sleep 2
+          
+          # Принудительно завершаем любые оставшиеся процессы
+          echo "Searching for processes to kill..."
+          if pgrep -f "/usr/local/bin/repostbot"; then
+            echo "Process is still running, killing with SIGKILL"
+            sudo pkill -9 -f "/usr/local/bin/repostbot" || true
+            sleep 3
+          fi
+
+          # Проверяем еще раз и показываем список
+          if pgrep -f "/usr/local/bin/repostbot"; then
+            echo "WARNING: Process still running! Details:"
+            sudo ps aux | grep repostbot
+            # Убиваем все процессы принудительно по имени файла
+            sudo fuser -k /usr/local/bin/repostbot 2>/dev/null || true
+            sleep 2
+          fi
 
       - name: Copy executable
         run: |
-          # Проверяем, запущен ли процесс
-          if pgrep -f "/usr/local/bin/repostbot"; then
-            echo "Process is still running, trying to kill it"
-            sudo pkill -f "/usr/local/bin/repostbot" || true
-            sleep 2
-          fi
+          # Сначала копируем с другим именем
+          sudo cp repostbot /usr/local/bin/repostbot.new
+          sudo chmod +x /usr/local/bin/repostbot.new
           
-          # Копируем исполняемый файл
-          sudo cp repostbot /usr/local/bin/
-          sudo chmod +x /usr/local/bin/repostbot
+          # Затем перемещаем файл (атомарная операция)
+          sudo mv -f /usr/local/bin/repostbot.new /usr/local/bin/repostbot
 
       - name: Configure systemd
         run: |
