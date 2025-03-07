@@ -1,4 +1,4 @@
-name: Deploy VK Telegram Repost Bot
+name: Deploy RepostBot
 
 on:
   push:
