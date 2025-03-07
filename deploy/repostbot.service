@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 ExecStart=/usr/local/bin/repostbot
-WorkingDirectory={{WORKDIR}}
+WorkingDirectory=/home/%USER%/repostbot
 Restart=always
-Environment="CONFIG_PATH=%h/repostbot/config.json"
+Environment="CONFIG_PATH=/home/%USER%/repostbot/config.json"
 User=%USER%
 
 [Install]
