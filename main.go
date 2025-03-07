@@ -12,13 +12,11 @@ import (
 )
 
 func main() {
-	// Загружаем конфигурацию
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Ошибка загрузки конфигурации: %v", err)
 	}
 
-	// Выводим значения переменных окружения
 	fmt.Println("TG_TOKEN:", cfg.TGToken)
 	fmt.Println("VK_TOKEN:", cfg.VKToken)
 	fmt.Println("CHAT_ID:", cfg.ChatID)
@@ -46,7 +44,6 @@ func main() {
 				log.Printf("Кэш успешно сохранен")
 			}
 
-			// Ограничиваем частоту сохранений
 			time.Sleep(5 * time.Second)
 		}
 	}()
