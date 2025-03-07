@@ -51,7 +51,7 @@ func (c *VKClient) GetWallPosts(owner_id string, count int) ([]VKPost, error) {
 
 	resp, err := http.Get(fmt.Sprintf("%s?%s", baseURL, params.Encode()))
 	if err != nil {
-		return nil, fmt.Errorf("failed to send HTTP request: %v", err)
+		return nil, fmt.Errorf("не удалось отправить HTTP запрос: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -62,7 +62,7 @@ func (c *VKClient) GetWallPosts(owner_id string, count int) ([]VKPost, error) {
 	}
 
 	if len(result.Response.Items) == 0 {
-		return nil, fmt.Errorf("no posts found for owner_id=%s", owner_id)
+		return nil, fmt.Errorf("не найдены новые посты(либо вообще их нет) owner_id=%s", owner_id)
 	}
 	fmt.Printf("VK API response: %+v\n", result.Response.Items)
 	return result.Response.Items, nil

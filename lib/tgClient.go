@@ -76,16 +76,16 @@ func (c *TGClient) SendPhoto(photoURL string) error {
 
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		return fmt.Errorf("failed to send HTTP request: %v", err)
+		return fmt.Errorf("не удалось отправить HTTP запрос: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var respBody map[string]interface{}
+		var respBody map[string]any
 		json.NewDecoder(resp.Body).Decode(&respBody)
-		return fmt.Errorf("failed to send photo: status=%d, body=%v", resp.StatusCode, respBody)
+		return fmt.Errorf("не удалось отправить фото: статус=%d, тело=%v", resp.StatusCode, respBody)
 	}
-	fmt.Printf("Sending message to Telegram: %+v\n", payload)
+	fmt.Printf("Отправка сообщения в телегу: %+v\n", payload)
 	return nil
 }
 
@@ -112,16 +112,16 @@ func (c *TGClient) SendMediaGroup(photoURLs []string) error {
 
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		return fmt.Errorf("failed to send HTTP request: %v", err)
+		return fmt.Errorf("не удалось отправить HTTP запрос: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		var respBody map[string]interface{}
 		json.NewDecoder(resp.Body).Decode(&respBody)
-		return fmt.Errorf("failed to send media group: status=%d, body=%v", resp.StatusCode, respBody)
+		return fmt.Errorf("не удалось отправить группу фото: статус=%d, тело=%v", resp.StatusCode, respBody)
 	}
-	fmt.Printf("Sending message to Telegram: %+v\n", payload)
+	fmt.Printf("Отправка сообщения в телегу: %+v\n", payload)
 	return nil
 }
 
@@ -140,15 +140,15 @@ func (c *TGClient) EditMessage(messageID int, text string) error {
 
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		return fmt.Errorf("failed to send HTTP request: %v", err)
+		return fmt.Errorf("не удалось отправить HTTP запрос: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		var respBody map[string]interface{}
 		json.NewDecoder(resp.Body).Decode(&respBody)
-		return fmt.Errorf("failed to edit message: status=%d, body=%v", resp.StatusCode, respBody)
+		return fmt.Errorf("не удалось отправить сообщение: статус=%d, тело=%v", resp.StatusCode, respBody)
 	}
-	fmt.Printf("Sending message to Telegram: %+v\n", payload)
+	fmt.Printf("Отправка сообщения в телегу: %+v\n", payload)
 	return nil
 }

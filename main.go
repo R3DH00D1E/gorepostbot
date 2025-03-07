@@ -49,7 +49,7 @@ func main() {
 
 			tgMessageIDs, err := tgClient.SendMessage(post.Text)
 			if err != nil {
-				log.Printf("Failed to send message: %v", err)
+				log.Printf("Не удалось отправить сообщение: %v", err)
 				continue
 			}
 
@@ -60,13 +60,13 @@ func main() {
 						lastSize := attachment.Photo.Sizes[len(attachment.Photo.Sizes)-1]
 						err := tgClient.SendPhoto(lastSize.URL)
 						if err != nil {
-							log.Printf("Failed to send photo: %v", err)
+							log.Printf("Не удалось отправить фото: %v", err)
 						}
 					}
 				case "video":
-					log.Printf("Video attachment detected (not supported yet): %+v", attachment)
+					log.Printf("Видео ещё не поддерживается: %+v", attachment)
 				default:
-					log.Printf("Unsupported attachment type: %s", attachment.Type)
+					log.Printf("Неподдерживаемый вид: %s", attachment.Type)
 				}
 			}
 
@@ -90,7 +90,7 @@ func main() {
 
 		time.Sleep(time.Duration(cfg.PollInterval) * time.Second)
 		if err != nil {
-			fmt.Println("Error:", err)
+			fmt.Println("Ошибка:", err)
 		}
 	}
 }

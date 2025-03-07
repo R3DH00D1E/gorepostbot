@@ -28,16 +28,16 @@ func LoadConfig() (*Config, error) {
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config file (%s): %w", configPath, err)
+		return nil, fmt.Errorf("не удалось прочитать конфиг (%s): %w", configPath, err)
 	}
 
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse config file: %w", err)
+		return nil, fmt.Errorf("не удалось захватить файл конфига: %w", err)
 	}
 
 	if cfg.TGToken == "" || cfg.VKToken == "" || cfg.TargetUser == "" || cfg.CacheFile == "" || cfg.ChatID == "" {
-		return nil, fmt.Errorf("missing required configuration fields")
+		return nil, fmt.Errorf("недостаточно полей для обработки файла")
 	}
 
 	return &cfg, nil
