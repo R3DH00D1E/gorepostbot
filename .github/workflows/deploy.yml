@@ -47,12 +47,6 @@ jobs:
           # Убедимся, что права доступа правильные
           chown -R ${{ secrets.USER }}:${{ secrets.USER }} /home/${{ secrets.USER }}/repostbot
 
-      - name: Copy executable
-        run: |
-          # Копируем исполняемый файл
-          sudo cp repostbot /usr/local/bin/
-          sudo chmod +x /usr/local/bin/repostbot
-
       - name: Substitute placeholders in repostbot.service
         run: |
           # Проверяем, существует ли файл
@@ -74,7 +68,32 @@ jobs:
 
       - name: Copy repostbot.timer
         run: |
-          sudo cp deploy/repostbot.timer /etc/systemd/system/repostbot.timer
+          if [ -f deploy/repostbot.timer ]; then
+            sudo cp deploy/repostbot.timer /etc/systemd/system/repostbot.timer
+          else
+            echo "Warning: repostbot.timer not found, skipping"
+          fi
+
+      - name: Stop existing services
+        run: |
+          # Останавливаем существующие службы
+          sudo systemctl stop repostbot.service || true
+          sudo systemctl stop repostbot.timer || true
+          # Даем процессу время завершиться
+          sleep 2
+
+      - name: Copy executable
+        run: |
+          # Проверяем, запущен ли процесс
+          if pgrep -f "/usr/local/bin/repostbot"; then
+            echo "Process is still running, trying to kill it"
+            sudo pkill -f "/usr/local/bin/repostbot" || true
+            sleep 2
+          fi
+          
+          # Копируем исполняемый файл
+          sudo cp repostbot /usr/local/bin/
+          sudo chmod +x /usr/local/bin/repostbot
 
       - name: Configure systemd
         run: |
@@ -83,6 +102,12 @@ jobs:
 
           # Включаем и запускаем службы
           sudo systemctl enable repostbot.service
-          sudo systemctl enable repostbot.timer
+          
+          # Если существует таймер, включаем и его
+          if [ -f /etc/systemd/system/repostbot.timer ]; then
+            sudo systemctl enable repostbot.timer
+            sudo systemctl restart repostbot.timer
+          fi
+          
+          # Запускаем основную службу
           sudo systemctl restart repostbot.service
-          sudo systemctl restart repostbot.timer
