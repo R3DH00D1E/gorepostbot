@@ -3,12 +3,14 @@ package main
 import (
 	"fmt"
 	"log"
+	"sort"
 	"sync"
 	"time"
 
 	"gorepostbot/bin"
 	"gorepostbot/config"
 	"gorepostbot/lib"
+	"gorepostbot/utils"
 )
 
 func main() {
@@ -49,7 +51,7 @@ func main() {
 	}()
 
 	for {
-		posts, err := vkClient.GetWallPosts(cfg.TargetUser, 10)
+		posts, err := vkClient.GetWallPosts(cfg.TargetUser, 20) // Увеличим количество постов для проверки
 		if err != nil {
 			log.Printf("Не удалось просмотреть посты: %v", err)
 			time.Sleep(time.Duration(cfg.PollInterval) * time.Second)
@@ -57,59 +59,43 @@ func main() {
 		}
 
 		if len(posts) == 0 {
-			log.Println("Новых постов не обнаружено")
+			log.Println("Постов не обнаружено")
 			time.Sleep(time.Duration(cfg.PollInterval) * time.Second)
 			continue
 		}
 
+		sort.Slice(posts, func(i, j int) bool {
+			return posts[i].ID < posts[j].ID
+		})
+
 		var cacheMutex sync.Mutex
 		var wg sync.WaitGroup
 
-		for _, post := range posts {
-			if post.ID <= cache.LastPostID {
-				continue
-			}
+		var newPosts []lib.VKPost
+		var modifiedPosts []lib.VKPost
 
+		for _, post := range posts {
+			cachedPost := cache.FindPost(post.ID)
+			if cachedPost == nil && post.ID > cache.LastPostID {
+				newPosts = append(newPosts, post)
+			} else if cachedPost != nil && cachedPost.LastModified < post.Date {
+				modifiedPosts = append(modifiedPosts, post)
+			}
+		}
+
+		for _, post := range newPosts {
 			wg.Add(1)
 			go func(p lib.VKPost) {
 				defer wg.Done()
 
-				log.Printf("Обработка поста ID %d", p.ID)
+				log.Printf("Обработка нового поста ID %d", p.ID)
 				tgMessageIDs, err := tgClient.SendMessage(p.Text)
 				if err != nil {
 					log.Printf("Не удалось отправить сообщение: %v", err)
 					return
 				}
 
-				if len(p.Attachments) > 0 {
-					var attachWg sync.WaitGroup
-
-					for _, attachment := range p.Attachments {
-						attachWg.Add(1)
-						go func(att lib.VKAttachment) {
-							defer attachWg.Done()
-
-							switch att.Type {
-							case "photo":
-								if att.Photo != nil {
-									lastSize := att.Photo.Sizes[len(att.Photo.Sizes)-1]
-									err := tgClient.SendPhoto(lastSize.URL)
-									if err != nil {
-										log.Printf("Не удалось отправить фото: %v", err)
-									} else {
-										log.Printf("Отправлено фото для поста %d", p.ID)
-									}
-								}
-							case "video":
-								log.Printf("Видео ещё не поддерживается: %+v", att)
-							default:
-								log.Printf("Неподдерживаемый вид: %s", att.Type)
-							}
-						}(attachment)
-					}
-
-					attachWg.Wait()
-				}
+				photoURLs := processAttachments(p, tgClient)
 
 				cacheMutex.Lock()
 				defer cacheMutex.Unlock()
@@ -119,6 +105,7 @@ func main() {
 						VKRecordID:   p.ID,
 						TGMessageID:  tgMessageID,
 						LastModified: p.Date,
+						PhotoURLs:    photoURLs,
 					})
 				}
 
@@ -134,6 +121,43 @@ func main() {
 			}(post)
 		}
 
+		for _, post := range modifiedPosts {
+			wg.Add(1)
+			go func(p lib.VKPost) {
+				defer wg.Done()
+
+				log.Printf("Обработка измененного поста ID %d", p.ID)
+
+				relatedPosts := cache.FindPostsByVKID(p.ID)
+				if len(relatedPosts) == 0 {
+					log.Printf("Не найдены связанные сообщения для поста ID %d", p.ID)
+					return
+				}
+
+				parts := utils.SplitText(p.Text, 4096)
+
+				for i, relatedPost := range relatedPosts {
+					if i < len(parts) {
+						err := tgClient.EditMessage(relatedPost.TGMessageID, parts[i])
+						if err != nil {
+							log.Printf("Не удалось обновить сообщение %d: %v", relatedPost.TGMessageID, err)
+						} else {
+							log.Printf("Обновлено сообщение %d для поста %d", relatedPost.TGMessageID, p.ID)
+
+							cacheMutex.Lock()
+							cache.UpdatePost(p.ID, p.Date)
+							cacheMutex.Unlock()
+
+							select {
+							case cacheUpdates <- struct{}{}:
+							default:
+							}
+						}
+					}
+				}
+			}(post)
+		}
+
 		wg.Wait()
 
 		select {
@@ -143,4 +167,44 @@ func main() {
 
 		time.Sleep(time.Duration(cfg.PollInterval) * time.Second)
 	}
+}
+
+func processAttachments(p lib.VKPost, tgClient *lib.TGClient) []string {
+	var photoURLs []string
+
+	if len(p.Attachments) > 0 {
+		var attachWg sync.WaitGroup
+		var urlsMutex sync.Mutex
+
+		for _, attachment := range p.Attachments {
+			attachWg.Add(1)
+			go func(att lib.VKAttachment) {
+				defer attachWg.Done()
+
+				switch att.Type {
+				case "photo":
+					if att.Photo != nil {
+						lastSize := att.Photo.Sizes[len(att.Photo.Sizes)-1]
+						err := tgClient.SendPhoto(lastSize.URL)
+						if err != nil {
+							log.Printf("Не удалось отправить фото: %v", err)
+						} else {
+							log.Printf("Отправлено фото для поста %d", p.ID)
+							urlsMutex.Lock()
+							photoURLs = append(photoURLs, lastSize.URL)
+							urlsMutex.Unlock()
+						}
+					}
+				case "video":
+					log.Printf("Видео ещё не поддерживается: %+v", att)
+				default:
+					log.Printf("Неподдерживаемый вид: %s", att.Type)
+				}
+			}(attachment)
+		}
+
+		attachWg.Wait()
+	}
+
+	return photoURLs
 }

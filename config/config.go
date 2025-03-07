@@ -2,43 +2,56 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"os"
-	"path/filepath"
 )
 
 type Config struct {
-	TGToken      string `json:"TG_TOKEN"`
-	VKToken      string `json:"VK_TOKEN"`
-	TargetUser   string `json:"TARGET_USER"`
-	CacheFile    string `json:"CACHE_FILE"`
-	PollInterval int    `json:"POLL_INTERVAL"`
-	ChatID       string `json:"CHAT_ID"`
+	VKToken      string `json:"vk_token"`
+	TGToken      string `json:"tg_token"`
+	ChatID       string `json:"chat_id"`
+	PollInterval int    `json:"poll_interval"`
+	TargetUser   string `json:"target_user"`
+	CacheFile    string `json:"cache_file"`
 }
 
 func LoadConfig() (*Config, error) {
 	configPath := os.Getenv("CONFIG_PATH")
 	if configPath == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("failed to determine user home directory: %w", err)
-		}
-		configPath = filepath.Join(homeDir, "repostbot", "config.json")
+		configPath = "config.json"
 	}
 
-	data, err := os.ReadFile(configPath)
+	file, err := os.Open(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("не удалось прочитать конфиг (%s): %w", configPath, err)
+		return nil, errors.New("не удалось открыть файл конфигурации: " + err.Error())
+	}
+	defer file.Close()
+
+	var config Config
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&config); err != nil {
+		return nil, errors.New("ошибка разбора JSON: " + err.Error())
 	}
 
-	var cfg Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("не удалось захватить файл конфига: %w", err)
+	if config.VKToken == "" {
+		return nil, errors.New("не указан токен VK")
+	}
+	if config.TGToken == "" {
+		return nil, errors.New("не указан токен Telegram")
+	}
+	if config.ChatID == "" {
+		return nil, errors.New("не указан ID чата")
+	}
+	if config.TargetUser == "" {
+		return nil, errors.New("не указан ID пользователя ВК")
 	}
 
-	if cfg.TGToken == "" || cfg.VKToken == "" || cfg.TargetUser == "" || cfg.CacheFile == "" || cfg.ChatID == "" {
-		return nil, fmt.Errorf("недостаточно полей для обработки файла")
+	if config.PollInterval <= 0 {
+		config.PollInterval = 10
+	}
+	if config.CacheFile == "" {
+		config.CacheFile = "cache.json"
 	}
 
-	return &cfg, nil
+	return &config, nil
 }
