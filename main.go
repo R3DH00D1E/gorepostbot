@@ -74,7 +74,15 @@ func main() {
 		var newPosts []lib.VKPost
 		var modifiedPosts []lib.VKPost
 
+		currentTime := time.Now().Unix()
+		twoDaysAgo := currentTime - (2 * 24 * 60 * 60)
+
 		for _, post := range posts {
+			if int64(post.Date) < twoDaysAgo {
+				log.Printf("Пропуск поста ID %d: пост старше 2 дней (дата: %v)", post.ID, time.Unix(int64(post.Date), 0).Format("02.01.2006 15:04:05"))
+				continue
+			}
+
 			cachedPost := cache.FindPost(post.ID)
 			if cachedPost == nil && post.ID > cache.LastPostID {
 				newPosts = append(newPosts, post)
@@ -82,6 +90,8 @@ func main() {
 				modifiedPosts = append(modifiedPosts, post)
 			}
 		}
+
+		log.Printf("Найдено %d новых и %d модифицированных постов не старше 2 дней", len(newPosts), len(modifiedPosts))
 
 		for _, post := range newPosts {
 			wg.Add(1)
