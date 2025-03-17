@@ -138,11 +138,11 @@ func main() {
 
 				for i, relatedPost := range relatedPosts {
 					if i < len(parts) {
-						err := tgClient.EditMessage(relatedPost.TGMessageID, parts[i])
+						err := tgClient.EditMessageWithEditMark(relatedPost.TGMessageID, parts[i], p.Date)
 						if err != nil {
 							log.Printf("Не удалось обновить сообщение %d: %v", relatedPost.TGMessageID, err)
 						} else {
-							log.Printf("Обновлено сообщение %d для поста %d", relatedPost.TGMessageID, p.ID)
+							log.Printf("Обновлено сообщение %d для поста %d с пометкой об изменении", relatedPost.TGMessageID, p.ID)
 
 							cacheMutex.Lock()
 							cache.UpdatePost(p.ID, p.Date)

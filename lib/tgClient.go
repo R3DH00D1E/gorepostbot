@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"gorepostbot/utils"
 	"net/http"
+	"time"
 )
 
 type TGClient struct {
@@ -151,4 +152,13 @@ func (c *TGClient) EditMessage(messageID int, text string) error {
 	}
 	fmt.Printf("Отправка сообщения в телегу: %+v\n", payload)
 	return nil
+}
+
+func (c *TGClient) EditMessageWithEditMark(messageID int, text string, editTime int) error {
+	t := time.Unix(int64(editTime), 0)
+	formattedTime := t.Format("02.01.2006 15:04:05")
+
+	textWithEditMark := fmt.Sprintf("%s\n\n[ Отредактировано: %s ]", text, formattedTime)
+
+	return c.EditMessage(messageID, textWithEditMark)
 }
