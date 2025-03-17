@@ -18,7 +18,11 @@ func NewTGClient(token, chatID string) *TGClient {
 	return &TGClient{Token: token, ChatID: chatID}
 }
 
-func (c *TGClient) SendMessage(text string) ([]int, error) {
+func (c *TGClient) SendMessage(text string, photoCount int) ([]int, error) {
+	if photoCount > 0 {
+		photoText := fmt.Sprintf("\n\n[%dx Photo]", photoCount)
+		text += photoText
+	}
 
 	parts := utils.SplitText(text, 4096)
 	var messageIDs []int
