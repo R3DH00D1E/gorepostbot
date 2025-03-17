@@ -77,6 +77,18 @@ func (c *Cache) UpdatePost(vkRecordID int, lastModified int) bool {
 	return updated
 }
 
+func (c *Cache) UpdatePostWithPhotos(vkRecordID int, lastModified int, photoURLs []string) bool {
+	updated := false
+	for i, post := range c.Posts {
+		if post.VKRecordID == vkRecordID {
+			c.Posts[i].LastModified = lastModified
+			c.Posts[i].PhotoURLs = photoURLs
+			updated = true
+		}
+	}
+	return updated
+}
+
 func (c *Cache) FindPost(vkRecordID int) *Post {
 	for _, post := range c.Posts {
 		if post.VKRecordID == vkRecordID {

@@ -130,17 +130,50 @@ func main() {
 				log.Printf("Обработка измененного поста ID %d", p.ID)
 
 				relatedPosts := cache.FindPostsByVKID(p.ID)
+				if len(relatedPosts) == 0 {
+					log.Printf("Не найдены связанные посты для ID %d", p.ID)
+					return
+				}
+
+				photoURLs := processAttachments(p, tgClient)
+
+				oldPhotoURLs := relatedPosts[0].PhotoURLs
+				photoChanged := !arePhotoURLsEqual(oldPhotoURLs, photoURLs)
+
+				if photoChanged && len(photoURLs) > 0 {
+					log.Printf("Обнаружены изменения в фотографиях для поста %d", p.ID)
+					if len(photoURLs) > 1 {
+						err := tgClient.SendMediaGroup(photoURLs)
+						if err != nil {
+							log.Printf("Не удалось отправить обновленную группу фото: %v", err)
+						} else {
+							log.Printf("Отправлена обновленная группа из %d фото для поста %d", len(photoURLs), p.ID)
+						}
+					} else {
+						err := tgClient.SendPhoto(photoURLs[0])
+						if err != nil {
+							log.Printf("Не удалось отправить обновленное фото: %v", err)
+						} else {
+							log.Printf("Отправлено обновленное фото для поста %d", p.ID)
+						}
+					}
+				}
 
 				parts := utils.SplitText(p.Text, 4096)
 				for i, relatedPost := range relatedPosts {
 					if i < len(parts) {
-						err := tgClient.EditMessageWithEditMark(relatedPost.TGMessageID, parts[i], p.Date)
+						messageText := parts[i]
+						if i == len(parts)-1 && len(photoURLs) > 0 {
+							messageText = fmt.Sprintf("%s\n\n[%dx Photo]", messageText, len(photoURLs))
+						}
+
+						err := tgClient.EditMessageWithEditMark(relatedPost.TGMessageID, messageText, p.Date)
 						if err != nil {
 							log.Printf("Не удалось обновить сообщение %d: %v", relatedPost.TGMessageID, err)
 						} else {
 							log.Printf("Обновлено сообщение %d для поста %d с пометкой об изменении", relatedPost.TGMessageID, p.ID)
 							cacheMutex.Lock()
-							cache.UpdatePost(p.ID, p.Date)
+							cache.UpdatePostWithPhotos(p.ID, p.Date, photoURLs)
 							cacheMutex.Unlock()
 
 							select {
@@ -214,4 +247,23 @@ func processAttachments(p lib.VKPost, tgClient *lib.TGClient) []string {
 	}
 
 	return photoURLs
+}
+
+func arePhotoURLsEqual(old, new []string) bool {
+	if len(old) != len(new) {
+		return false
+	}
+
+	urlMap := make(map[string]bool)
+	for _, url := range old {
+		urlMap[url] = true
+	}
+
+	for _, url := range new {
+		if !urlMap[url] {
+			return false
+		}
+	}
+
+	return true
 }
