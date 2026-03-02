@@ -89,7 +89,7 @@ func main() {
 			} else if cachedPost != nil {
 				// Вычисляем хеш текущего содержимого поста
 				currentTextHash := utils.ComputeTextHash(post.Text)
-				
+
 				// Получаем URL фотографий для вычисления хеша
 				var currentPhotoURLs []string
 				for _, attachment := range post.Attachments {
@@ -99,12 +99,12 @@ func main() {
 					}
 				}
 				currentPhotoHash := utils.ComputePhotoURLsHash(currentPhotoURLs)
-				
+
 				// Проверяем, изменился ли текст или фото
 				if cachedPost.TextHash != currentTextHash || cachedPost.PhotoHash != currentPhotoHash {
-					log.Printf("Обнаружены изменения в посте ID %d (текст: %v, фото: %v)", 
-						post.ID, 
-						cachedPost.TextHash != currentTextHash, 
+					log.Printf("Обнаружены изменения в посте ID %d (текст: %v, фото: %v)",
+						post.ID,
+						cachedPost.TextHash != currentTextHash,
 						cachedPost.PhotoHash != currentPhotoHash)
 					modifiedPosts = append(modifiedPosts, post)
 				}
@@ -186,10 +186,22 @@ func main() {
 
 				// Проверяем, что изменилось
 				oldPost := relatedPosts[0]
+
+				// Если хеши не были сохранены ранее (старый кеш), вычисляем их из сохраненных данных
+				if oldPost.TextHash == "" {
+					// Для старых записей без хеша - нужно инициализировать хеши
+					cacheMutex.Lock()
+					cache.UpdatePostHashes(p.ID, newTextHash, newPhotoHash)
+					cacheMutex.Unlock()
+					log.Printf("Инициализированы хеши для существующего поста %d", p.ID)
+					return // Пропускаем обновление, т.к. это первая инициализация
+				}
+
 				textChanged := oldPost.TextHash != newTextHash
 				photoChanged := oldPost.PhotoHash != newPhotoHash
 
-				log.Printf("Изменения в посте %d: текст=%v, фото=%v", p.ID, textChanged, photoChanged)
+				log.Printf("Изменения в посте %d: текст=%v, фото=%v (старый хеш текста: %s, новый: %s)",
+					p.ID, textChanged, photoChanged, oldPost.TextHash[:8], newTextHash[:8])
 
 				// Обрабатываем изменения в фотографиях
 				if photoChanged {
