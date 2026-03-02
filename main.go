@@ -86,8 +86,28 @@ func main() {
 			cachedPost := cache.FindPost(post.ID)
 			if cachedPost == nil && post.ID > cache.LastPostID {
 				newPosts = append(newPosts, post)
-			} else if cachedPost != nil && cachedPost.LastModified < post.Date {
-				modifiedPosts = append(modifiedPosts, post)
+			} else if cachedPost != nil {
+				// Вычисляем хеш текущего содержимого поста
+				currentTextHash := utils.ComputeTextHash(post.Text)
+				
+				// Получаем URL фотографий для вычисления хеша
+				var currentPhotoURLs []string
+				for _, attachment := range post.Attachments {
+					if attachment.Type == "photo" && attachment.Photo != nil && len(attachment.Photo.Sizes) > 0 {
+						lastSize := attachment.Photo.Sizes[len(attachment.Photo.Sizes)-1]
+						currentPhotoURLs = append(currentPhotoURLs, lastSize.URL)
+					}
+				}
+				currentPhotoHash := utils.ComputePhotoURLsHash(currentPhotoURLs)
+				
+				// Проверяем, изменился ли текст или фото
+				if cachedPost.TextHash != currentTextHash || cachedPost.PhotoHash != currentPhotoHash {
+					log.Printf("Обнаружены изменения в посте ID %d (текст: %v, фото: %v)", 
+						post.ID, 
+						cachedPost.TextHash != currentTextHash, 
+						cachedPost.PhotoHash != currentPhotoHash)
+					modifiedPosts = append(modifiedPosts, post)
+				}
 			}
 		}
 
@@ -108,6 +128,10 @@ func main() {
 					return
 				}
 
+				// Вычисляем хеши для нового поста
+				textHash := utils.ComputeTextHash(p.Text)
+				photoHash := utils.ComputePhotoURLsHash(photoURLs)
+
 				cacheMutex.Lock()
 				defer cacheMutex.Unlock()
 
@@ -117,6 +141,8 @@ func main() {
 						TGMessageID:  tgMessageID,
 						LastModified: p.Date,
 						PhotoURLs:    photoURLs,
+						TextHash:     textHash,
+						PhotoHash:    photoHash,
 					})
 				}
 
@@ -145,53 +171,80 @@ func main() {
 					return
 				}
 
-				photoURLs := processAttachments(p, tgClient)
+				// Получаем URL фотографий
+				var photoURLs []string
+				for _, attachment := range p.Attachments {
+					if attachment.Type == "photo" && attachment.Photo != nil && len(attachment.Photo.Sizes) > 0 {
+						lastSize := attachment.Photo.Sizes[len(attachment.Photo.Sizes)-1]
+						photoURLs = append(photoURLs, lastSize.URL)
+					}
+				}
 
-				oldPhotoURLs := relatedPosts[0].PhotoURLs
-				photoChanged := !arePhotoURLsEqual(oldPhotoURLs, photoURLs)
+				// Вычисляем новые хеши
+				newTextHash := utils.ComputeTextHash(p.Text)
+				newPhotoHash := utils.ComputePhotoURLsHash(photoURLs)
 
-				if photoChanged && len(photoURLs) > 0 {
-					log.Printf("Обнаружены изменения в фотографиях для поста %d", p.ID)
-					if len(photoURLs) > 1 {
-						err := tgClient.SendMediaGroup(photoURLs)
-						if err != nil {
-							log.Printf("Не удалось отправить обновленную группу фото: %v", err)
+				// Проверяем, что изменилось
+				oldPost := relatedPosts[0]
+				textChanged := oldPost.TextHash != newTextHash
+				photoChanged := oldPost.PhotoHash != newPhotoHash
+
+				log.Printf("Изменения в посте %d: текст=%v, фото=%v", p.ID, textChanged, photoChanged)
+
+				// Обрабатываем изменения в фотографиях
+				if photoChanged {
+					if len(photoURLs) > 0 {
+						log.Printf("Обнаружены изменения в фотографиях для поста %d", p.ID)
+						if len(photoURLs) > 1 {
+							err := tgClient.SendMediaGroup(photoURLs)
+							if err != nil {
+								log.Printf("Не удалось отправить обновленную группу фото: %v", err)
+							} else {
+								log.Printf("Отправлена обновленная группа из %d фото для поста %d", len(photoURLs), p.ID)
+							}
 						} else {
-							log.Printf("Отправлена обновленная группа из %d фото для поста %d", len(photoURLs), p.ID)
+							err := tgClient.SendPhoto(photoURLs[0])
+							if err != nil {
+								log.Printf("Не удалось отправить обновленное фото: %v", err)
+							} else {
+								log.Printf("Отправлено обновленное фото для поста %d", p.ID)
+							}
 						}
 					} else {
-						err := tgClient.SendPhoto(photoURLs[0])
-						if err != nil {
-							log.Printf("Не удалось отправить обновленное фото: %v", err)
-						} else {
-							log.Printf("Отправлено обновленное фото для поста %d", p.ID)
+						log.Printf("Фотографии были удалены из поста %d", p.ID)
+					}
+				}
+
+				// Обрабатываем изменения в тексте
+				if textChanged {
+					parts := utils.SplitText(p.Text, 4096)
+					for i, relatedPost := range relatedPosts {
+						if i < len(parts) {
+							messageText := parts[i]
+							// Добавляем информацию о количестве фото в последнюю часть
+							if i == len(parts)-1 && len(photoURLs) > 0 {
+								messageText = fmt.Sprintf("%s\n\n[%dx Photo]", messageText, len(photoURLs))
+							}
+
+							err := tgClient.EditMessageWithEditMark(relatedPost.TGMessageID, messageText, p.Date)
+							if err != nil {
+								log.Printf("Не удалось обновить сообщение %d: %v", relatedPost.TGMessageID, err)
+							} else {
+								log.Printf("Обновлено сообщение %d для поста %d с пометкой об изменении", relatedPost.TGMessageID, p.ID)
+							}
 						}
 					}
 				}
 
-				parts := utils.SplitText(p.Text, 4096)
-				for i, relatedPost := range relatedPosts {
-					if i < len(parts) {
-						messageText := parts[i]
-						if i == len(parts)-1 && len(photoURLs) > 0 {
-							messageText = fmt.Sprintf("%s\n\n[%dx Photo]", messageText, len(photoURLs))
-						}
+				// Обновляем кеш с новыми хешами
+				cacheMutex.Lock()
+				cache.UpdatePostWithPhotos(p.ID, p.Date, photoURLs)
+				cache.UpdatePostHashes(p.ID, newTextHash, newPhotoHash)
+				cacheMutex.Unlock()
 
-						err := tgClient.EditMessageWithEditMark(relatedPost.TGMessageID, messageText, p.Date)
-						if err != nil {
-							log.Printf("Не удалось обновить сообщение %d: %v", relatedPost.TGMessageID, err)
-						} else {
-							log.Printf("Обновлено сообщение %d для поста %d с пометкой об изменении", relatedPost.TGMessageID, p.ID)
-							cacheMutex.Lock()
-							cache.UpdatePostWithPhotos(p.ID, p.Date, photoURLs)
-							cacheMutex.Unlock()
-
-							select {
-							case cacheUpdates <- struct{}{}:
-							default:
-							}
-						}
-					}
+				select {
+				case cacheUpdates <- struct{}{}:
+				default:
 				}
 			}(post)
 		}

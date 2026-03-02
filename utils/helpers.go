@@ -1,6 +1,11 @@
 package utils
 
-import "strings"
+import (
+	"crypto/sha256"
+	"fmt"
+	"sort"
+	"strings"
+)
 
 func SplitText(text string, maxLength int) []string {
 	var parts []string
@@ -23,4 +28,22 @@ func SplitText(text string, maxLength int) []string {
 	}
 
 	return parts
+}
+
+// ComputeTextHash вычисляет SHA256 хеш текста
+func ComputeTextHash(text string) string {
+	hash := sha256.Sum256([]byte(text))
+	return fmt.Sprintf("%x", hash)
+}
+
+// ComputePhotoURLsHash вычисляет хеш списка URL фотографий
+func ComputePhotoURLsHash(urls []string) string {
+	// Сортируем URL для консистентности
+	sortedURLs := make([]string, len(urls))
+	copy(sortedURLs, urls)
+	sort.Strings(sortedURLs)
+	
+	combined := strings.Join(sortedURLs, "|")
+	hash := sha256.Sum256([]byte(combined))
+	return fmt.Sprintf("%x", hash)
 }
