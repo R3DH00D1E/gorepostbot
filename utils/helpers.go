@@ -42,8 +42,28 @@ func ComputePhotoURLsHash(urls []string) string {
 	sortedURLs := make([]string, len(urls))
 	copy(sortedURLs, urls)
 	sort.Strings(sortedURLs)
-	
+
 	combined := strings.Join(sortedURLs, "|")
 	hash := sha256.Sum256([]byte(combined))
+	return fmt.Sprintf("%x", hash)
+}
+
+// ComputePhotoIDsHash вычисляет хеш списка ID фотографий
+func ComputePhotoIDsHash(ids []int) string {
+	// Сортируем ID для консистентности
+	sortedIDs := make([]int, len(ids))
+	copy(sortedIDs, ids)
+	sort.Ints(sortedIDs)
+
+	// Преобразуем в строку
+	var builder strings.Builder
+	for i, id := range sortedIDs {
+		if i > 0 {
+			builder.WriteString("|")
+		}
+		builder.WriteString(fmt.Sprintf("%d", id))
+	}
+
+	hash := sha256.Sum256([]byte(builder.String()))
 	return fmt.Sprintf("%x", hash)
 }

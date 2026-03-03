@@ -90,7 +90,6 @@ func (c *TGClient) SendPhoto(photoURL string) error {
 		json.NewDecoder(resp.Body).Decode(&respBody)
 		return fmt.Errorf("не удалось отправить фото: статус=%d, тело=%v", resp.StatusCode, respBody)
 	}
-	fmt.Printf("Отправка сообщения в телегу: %+v\n", payload)
 	return nil
 }
 
@@ -126,7 +125,6 @@ func (c *TGClient) SendMediaGroup(photoURLs []string) error {
 		json.NewDecoder(resp.Body).Decode(&respBody)
 		return fmt.Errorf("не удалось отправить группу фото: статус=%d, тело=%v", resp.StatusCode, respBody)
 	}
-	fmt.Printf("Отправка сообщения в телегу: %+v\n", payload)
 	return nil
 }
 
@@ -154,7 +152,6 @@ func (c *TGClient) EditMessage(messageID int, text string) error {
 		json.NewDecoder(resp.Body).Decode(&respBody)
 		return fmt.Errorf("не удалось отправить сообщение: статус=%d, тело=%v", resp.StatusCode, respBody)
 	}
-	fmt.Printf("Отправка сообщения в телегу: %+v\n", payload)
 	return nil
 }
 
