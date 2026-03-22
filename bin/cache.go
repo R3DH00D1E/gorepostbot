@@ -11,6 +11,9 @@ type Post struct {
 	TGMessageID  int      `json:"tg_message_id"`
 	LastModified int      `json:"last_modified"`
 	PhotoURLs    []string `json:"photo_urls,omitempty"`
+	PhotoIDs     []int    `json:"photo_ids,omitempty"`
+	TextHash     string   `json:"text_hash,omitempty"`
+	PhotoHash    string   `json:"photo_hash,omitempty"`
 }
 
 type Cache struct {
@@ -77,12 +80,26 @@ func (c *Cache) UpdatePost(vkRecordID int, lastModified int) bool {
 	return updated
 }
 
-func (c *Cache) UpdatePostWithPhotos(vkRecordID int, lastModified int, photoURLs []string) bool {
+func (c *Cache) UpdatePostWithPhotos(vkRecordID int, lastModified int, photoURLs []string, photoIDs []int) bool {
 	updated := false
 	for i, post := range c.Posts {
 		if post.VKRecordID == vkRecordID {
 			c.Posts[i].LastModified = lastModified
 			c.Posts[i].PhotoURLs = photoURLs
+			c.Posts[i].PhotoIDs = photoIDs
+			updated = true
+		}
+	}
+	return updated
+}
+
+// UpdatePostHashes обновляет хеши текста и фото для поста
+func (c *Cache) UpdatePostHashes(vkRecordID int, textHash string, photoHash string) bool {
+	updated := false
+	for i, post := range c.Posts {
+		if post.VKRecordID == vkRecordID {
+			c.Posts[i].TextHash = textHash
+			c.Posts[i].PhotoHash = photoHash
 			updated = true
 		}
 	}

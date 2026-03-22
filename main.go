@@ -33,7 +33,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Не удалось загрузить кэш: %v", err)
 	}
-	log.Printf("Загружен кэш: %+v", cache)
+	log.Printf("Загружен кэш: %d постов, LastPostID=%d", len(cache.Posts), cache.LastPostID)
 
 	cacheUpdates := make(chan struct{}, 10)
 
@@ -86,8 +86,27 @@ func main() {
 			cachedPost := cache.FindPost(post.ID)
 			if cachedPost == nil && post.ID > cache.LastPostID {
 				newPosts = append(newPosts, post)
-			} else if cachedPost != nil && cachedPost.LastModified < post.Date {
-				modifiedPosts = append(modifiedPosts, post)
+			} else if cachedPost != nil {
+				// Вычисляем хеш текущего содержимого поста
+				currentTextHash := utils.ComputeTextHash(post.Text)
+
+				// Получаем ID фотографий для вычисления хеша
+				var currentPhotoIDs []int
+				for _, attachment := range post.Attachments {
+					if attachment.Type == "photo" && attachment.Photo != nil {
+						currentPhotoIDs = append(currentPhotoIDs, attachment.Photo.ID)
+					}
+				}
+				currentPhotoHash := utils.ComputePhotoIDsHash(currentPhotoIDs)
+
+				// Проверяем, изменился ли текст или фото
+				if cachedPost.TextHash != currentTextHash || cachedPost.PhotoHash != currentPhotoHash {
+					log.Printf("Обнаружены изменения в посте ID %d (текст: %v, фото: %v)",
+						post.ID,
+						cachedPost.TextHash != currentTextHash,
+						cachedPost.PhotoHash != currentPhotoHash)
+					modifiedPosts = append(modifiedPosts, post)
+				}
 			}
 		}
 
@@ -100,13 +119,17 @@ func main() {
 
 				log.Printf("Обработка нового поста ID %d", p.ID)
 
-				photoURLs := processAttachments(p, tgClient)
+				photoURLs, photoIDs := processAttachments(p, tgClient)
 
 				tgMessageIDs, err := tgClient.SendMessage(p.Text, len(photoURLs))
 				if err != nil {
 					log.Printf("Не удалось отправить сообщение: %v", err)
 					return
 				}
+
+				// Вычисляем хеши для нового поста
+				textHash := utils.ComputeTextHash(p.Text)
+				photoHash := utils.ComputePhotoIDsHash(photoIDs)
 
 				cacheMutex.Lock()
 				defer cacheMutex.Unlock()
@@ -117,6 +140,9 @@ func main() {
 						TGMessageID:  tgMessageID,
 						LastModified: p.Date,
 						PhotoURLs:    photoURLs,
+						PhotoIDs:     photoIDs,
+						TextHash:     textHash,
+						PhotoHash:    photoHash,
 					})
 				}
 
@@ -145,53 +171,96 @@ func main() {
 					return
 				}
 
-				photoURLs := processAttachments(p, tgClient)
-
-				oldPhotoURLs := relatedPosts[0].PhotoURLs
-				photoChanged := !arePhotoURLsEqual(oldPhotoURLs, photoURLs)
-
-				if photoChanged && len(photoURLs) > 0 {
-					log.Printf("Обнаружены изменения в фотографиях для поста %d", p.ID)
-					if len(photoURLs) > 1 {
-						err := tgClient.SendMediaGroup(photoURLs)
-						if err != nil {
-							log.Printf("Не удалось отправить обновленную группу фото: %v", err)
-						} else {
-							log.Printf("Отправлена обновленная группа из %d фото для поста %d", len(photoURLs), p.ID)
-						}
-					} else {
-						err := tgClient.SendPhoto(photoURLs[0])
-						if err != nil {
-							log.Printf("Не удалось отправить обновленное фото: %v", err)
-						} else {
-							log.Printf("Отправлено обновленное фото для поста %d", p.ID)
+				// Получаем URL и ID фотографий
+				var photoURLs []string
+				var photoIDs []int
+				for _, attachment := range p.Attachments {
+					if attachment.Type == "photo" && attachment.Photo != nil {
+						photoIDs = append(photoIDs, attachment.Photo.ID)
+						if len(attachment.Photo.Sizes) > 0 {
+							lastSize := attachment.Photo.Sizes[len(attachment.Photo.Sizes)-1]
+							photoURLs = append(photoURLs, lastSize.URL)
 						}
 					}
 				}
 
-				parts := utils.SplitText(p.Text, 4096)
-				for i, relatedPost := range relatedPosts {
-					if i < len(parts) {
-						messageText := parts[i]
-						if i == len(parts)-1 && len(photoURLs) > 0 {
-							messageText = fmt.Sprintf("%s\n\n[%dx Photo]", messageText, len(photoURLs))
-						}
+				// Вычисляем новые хеши
+				newTextHash := utils.ComputeTextHash(p.Text)
+				newPhotoHash := utils.ComputePhotoIDsHash(photoIDs)
 
-						err := tgClient.EditMessageWithEditMark(relatedPost.TGMessageID, messageText, p.Date)
-						if err != nil {
-							log.Printf("Не удалось обновить сообщение %d: %v", relatedPost.TGMessageID, err)
+				// Проверяем, что изменилось
+				oldPost := relatedPosts[0]
+
+				// Если хеши не были сохранены ранее (старый кеш), вычисляем их из сохраненных данных
+				if oldPost.TextHash == "" {
+					// Для старых записей без хеша - нужно инициализировать хеши
+					cacheMutex.Lock()
+					cache.UpdatePostHashes(p.ID, newTextHash, newPhotoHash)
+					cacheMutex.Unlock()
+					log.Printf("Инициализированы хеши для существующего поста %d", p.ID)
+					return // Пропускаем обновление, т.к. это первая инициализация
+				}
+
+				textChanged := oldPost.TextHash != newTextHash
+				photoChanged := oldPost.PhotoHash != newPhotoHash
+
+				log.Printf("Изменения в посте %d: текст=%v, фото=%v",
+					p.ID, textChanged, photoChanged)
+
+				// Обрабатываем изменения в фотографиях
+				if photoChanged {
+					if len(photoURLs) > 0 {
+						log.Printf("Обнаружены изменения в фотографиях для поста %d", p.ID)
+						if len(photoURLs) > 1 {
+							err := tgClient.SendMediaGroup(photoURLs)
+							if err != nil {
+								log.Printf("Не удалось отправить обновленную группу фото: %v", err)
+							} else {
+								log.Printf("Отправлена обновленная группа из %d фото для поста %d", len(photoURLs), p.ID)
+							}
 						} else {
-							log.Printf("Обновлено сообщение %d для поста %d с пометкой об изменении", relatedPost.TGMessageID, p.ID)
-							cacheMutex.Lock()
-							cache.UpdatePostWithPhotos(p.ID, p.Date, photoURLs)
-							cacheMutex.Unlock()
+							err := tgClient.SendPhoto(photoURLs[0])
+							if err != nil {
+								log.Printf("Не удалось отправить обновленное фото: %v", err)
+							} else {
+								log.Printf("Отправлено обновленное фото для поста %d", p.ID)
+							}
+						}
+					} else {
+						log.Printf("Фотографии были удалены из поста %d", p.ID)
+					}
+				}
 
-							select {
-							case cacheUpdates <- struct{}{}:
-							default:
+				// Обрабатываем изменения в тексте
+				if textChanged {
+					parts := utils.SplitText(p.Text, 4096)
+					for i, relatedPost := range relatedPosts {
+						if i < len(parts) {
+							messageText := parts[i]
+							// Добавляем информацию о количестве фото в последнюю часть
+							if i == len(parts)-1 && len(photoURLs) > 0 {
+								messageText = fmt.Sprintf("%s\n\n[%dx Photo]", messageText, len(photoURLs))
+							}
+
+							err := tgClient.EditMessageWithEditMark(relatedPost.TGMessageID, messageText, p.Date)
+							if err != nil {
+								log.Printf("Не удалось обновить сообщение %d: %v", relatedPost.TGMessageID, err)
+							} else {
+								log.Printf("Обновлено сообщение %d для поста %d с пометкой об изменении", relatedPost.TGMessageID, p.ID)
 							}
 						}
 					}
+				}
+
+				// Обновляем кеш с новыми хешами
+				cacheMutex.Lock()
+				cache.UpdatePostWithPhotos(p.ID, p.Date, photoURLs, photoIDs)
+				cache.UpdatePostHashes(p.ID, newTextHash, newPhotoHash)
+				cacheMutex.Unlock()
+
+				select {
+				case cacheUpdates <- struct{}{}:
+				default:
 				}
 			}(post)
 		}
@@ -207,8 +276,9 @@ func main() {
 	}
 }
 
-func processAttachments(p lib.VKPost, tgClient *lib.TGClient) []string {
+func processAttachments(p lib.VKPost, tgClient *lib.TGClient) ([]string, []int) {
 	var photoURLs []string
+	var photoIDs []int
 
 	if len(p.Attachments) > 0 {
 		var attachWg sync.WaitGroup
@@ -221,10 +291,13 @@ func processAttachments(p lib.VKPost, tgClient *lib.TGClient) []string {
 
 				switch att.Type {
 				case "photo":
-					if att.Photo != nil && len(att.Photo.Sizes) > 0 {
-						lastSize := att.Photo.Sizes[len(att.Photo.Sizes)-1]
+					if att.Photo != nil {
 						urlsMutex.Lock()
-						photoURLs = append(photoURLs, lastSize.URL)
+						photoIDs = append(photoIDs, att.Photo.ID)
+						if len(att.Photo.Sizes) > 0 {
+							lastSize := att.Photo.Sizes[len(att.Photo.Sizes)-1]
+							photoURLs = append(photoURLs, lastSize.URL)
+						}
 						urlsMutex.Unlock()
 					}
 				case "video":
@@ -256,7 +329,7 @@ func processAttachments(p lib.VKPost, tgClient *lib.TGClient) []string {
 		}
 	}
 
-	return photoURLs
+	return photoURLs, photoIDs
 }
 
 func arePhotoURLsEqual(old, new []string) bool {

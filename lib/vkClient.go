@@ -30,6 +30,7 @@ type VKAttachment struct {
 }
 
 type VKPhoto struct {
+	ID    int           `json:"id"`
 	Sizes []VKPhotoSize `json:"sizes"`
 }
 
@@ -64,6 +65,5 @@ func (c *VKClient) GetWallPosts(owner_id string, count int) ([]VKPost, error) {
 	if len(result.Response.Items) == 0 {
 		return nil, fmt.Errorf("не найдены новые посты(либо вообще их нет) owner_id=%s", owner_id)
 	}
-	fmt.Printf("VK API response: %+v\n", result.Response.Items)
 	return result.Response.Items, nil
 }
