@@ -40,7 +40,7 @@ jobs:
 
       - name: Create directory and copy config
         run: |
-          # Создаем директорию в домашней папке для конфигурации
+          # Создаем директорию в домашней папке для конфигурации сервиса
           mkdir -p /home/${{ secrets.USER }}/repostbot
           # Копируем конфигурацию
           cp deploy/config.json /home/${{ secrets.USER }}/repostbot/
